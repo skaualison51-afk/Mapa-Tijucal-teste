@@ -1,11 +1,9 @@
 // Inicializar mapa
 var map = L.map('map');
-
 var tijucalBounds = L.latLngBounds(
   L.latLng(-15.657, -56.105),
   L.latLng(-15.645, -56.090)
 );
-
 map.fitBounds(tijucalBounds);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -16,7 +14,7 @@ var ruasLayer;
 var selecionado = null;
 
 // Estilo padrão
-function estiloRua(feature) {
+function estiloRua() {
   return { color: "red", weight: 3 };
 }
 
@@ -35,6 +33,7 @@ function onEachRua(feature, layer) {
   });
 }
 
+// Função OSM → GeoJSON
 function osmToGeoJSON(osmData) {
   var features = osmData.elements.map(function(el){
     if(el.type === "way" && el.geometry){
@@ -42,7 +41,7 @@ function osmToGeoJSON(osmData) {
         type: "Feature",
         properties: { 
           name: el.tags && el.tags.name ? el.tags.name : null,
-          id: el.tags && el.tags.__id ? el.tags.__id : el.id
+          id: el.id
         },
         geometry: {
           type: "LineString",
@@ -54,7 +53,7 @@ function osmToGeoJSON(osmData) {
   return { type: "FeatureCollection", features: features };
 }
 
-// Buscar ruas do bairro Tijucal via Overpass
+// Buscar ruas
 fetch(`https://overpass-api.de/api/interpreter?data=
 [out:json][timeout:25];
 area["name"="Tijucal"]["boundary"="administrative"]->.a;
@@ -62,11 +61,6 @@ way(area.a)["highway"];
 out geom;`)
 .then(res => res.json())
 .then(data => {
-  data.elements.forEach((el, idx) => {
-    el.tags = el.tags || {};
-    el.tags.__id = el.id || idx;
-  });
-
   ruasLayer = L.geoJSON(osmToGeoJSON(data), {
     style: estiloRua,
     onEachFeature: onEachRua
@@ -102,34 +96,25 @@ function limparSelecao() {
   }
 }
 
-// ---------- Firebase ----------
-
-// Salvar progresso no Firebase
+// ----------------- Salvamento Local -----------------
 function salvarProgresso() {
-  if (!ruasLayer) {
-    alert("Nenhuma rua carregada ainda!");
-    return;
-  }
+  if (!ruasLayer) return;
 
-  let progresso = {};
+  var progresso = {};
   ruasLayer.eachLayer(function(layer){
     var chave = layer.feature.properties.name || layer.feature.properties.id;
     progresso[chave] = layer.options.status || "fazer";
   });
 
-  firebase.database().ref('progressoTijucal').set(progresso)
-    .then(() => alert("✅ Progresso salvo no Firebase!"))
-    .catch(err => alert("Erro ao salvar: " + err.message));
+  localStorage.setItem("progressoTijucal", JSON.stringify(progresso));
+  alert("✅ Progresso salvo no navegador!");
 }
 
-// Carregar progresso
 function carregarProgresso() {
-  firebase.database().ref('progressoTijucal').once('value')
-    .then(snapshot => {
-      var salvo = snapshot.val() || {};
-      aplicarProgresso(salvo);
-    })
-    .catch(err => console.error("Erro ao carregar progresso:", err));
+  var salvo = localStorage.getItem("progressoTijucal");
+  if (salvo) {
+    aplicarProgresso(JSON.parse(salvo));
+  }
 }
 
 function aplicarProgresso(salvo) {
@@ -145,5 +130,6 @@ function aplicarProgresso(salvo) {
   });
 }
 
-// Barra de busca restrita ao bairro Tijucal
+// Barra de busca
 L.Control.geocoder({ defaultMarkGeocode: true, bounds: tijucalBounds }).addTo(map);
+
