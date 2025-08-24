@@ -1,6 +1,12 @@
 // script.js (module)
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
+// Substitua pelos valores do seu Supabase
+const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
+const SUPABASE_KEY = "SUA_CHAVE_ANON";
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
 // ====== Supabase ======
 const SUPABASE_URL = "https://SEU_PROJETO.supabase.co";     // <- troque
 const SUPABASE_ANON_KEY = "SEU_ANON_PUBLIC_KEY";            // <- troque
@@ -173,3 +179,4 @@ function iniciarRealtime() {
 
 // Barra de busca restrita ao bairro Tijucal
 L.Control.geocoder({ defaultMarkGeocode: true, bounds: tijucalBounds }).addTo(map);
+
