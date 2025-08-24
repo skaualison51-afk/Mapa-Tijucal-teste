@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Mapa Tijucal - Ruas Interativas</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="controls">
+    <button onclick="marcarFeita()">✅ Marcar como Feita</button>
+    <button onclick="marcarFazer()">❌ Marcar como A Fazer</button>
+    <button onclick="limparSelecao()">🧹 Limpar Seleção</button>
+    <button onclick="salvarProgresso()">💾 Salvar Progresso</button>
+  </div>
+
+  <div id="legend">
+    <h4>Legenda</h4>
+    <p><span style="background: red;"></span> Rua a Fazer</p>
+    <p><span style="background: green;"></span> Rua Feita</p>
+    <p><span style="background: blue;"></span> Rua Selecionada</p>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js"></script>
+
+  <script src="script.js"></script>
+</body>
+</html>
