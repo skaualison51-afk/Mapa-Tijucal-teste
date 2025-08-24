@@ -6,6 +6,52 @@ const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
 const SUPABASE_KEY = "SUA_CHAVE_ANON";
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+async function salvarProgresso() {
+  let progresso = [];
+
+  ruasLayer.eachLayer(function(layer) {
+    let nome = layer.feature.properties.name || layer.feature.properties.id;
+    let status = layer.options.status || "fazer";
+
+    progresso.push({ nome, status });
+  });
+
+  // Limpa tabela e insere novamente
+  await supabase.from("ruas").delete().neq("id", 0);
+  let { data, error } = await supabase.from("ruas").insert(progresso);
+
+  if (error) {
+    console.error("Erro ao salvar:", error);
+    alert("Erro ao salvar progresso!");
+  } else {
+    alert("Progresso salvo com sucesso!");
+  }
+}
+async function carregarProgresso() {
+  let { data, error } = await supabase.from("ruas").select("*");
+
+  if (error) {
+    console.error("Erro ao carregar:", error);
+    return;
+  }
+
+  ruasLayer.eachLayer(function(layer) {
+    let nome = layer.feature.properties.name || layer.feature.properties.id;
+    let rua = data.find(r => r.nome === nome);
+
+    if (rua) {
+      if (rua.status === "feita") {
+        layer.setStyle({ color: "green", weight: 4 });
+        layer.options.status = "feita";
+      } else {
+        layer.setStyle({ color: "red", weight: 3 });
+        layer.options.status = "fazer";
+      }
+    }
+  });
+}
+
+
 
 // ====== Supabase ======
 const SUPABASE_URL = "https://SEU_PROJETO.supabase.co";     // <- troque
@@ -179,4 +225,5 @@ function iniciarRealtime() {
 
 // Barra de busca restrita ao bairro Tijucal
 L.Control.geocoder({ defaultMarkGeocode: true, bounds: tijucalBounds }).addTo(map);
+
 
