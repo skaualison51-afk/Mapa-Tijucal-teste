@@ -1,34 +1,115 @@
-// script.js (module)
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
-// Substitua pelos valores do seu Supabase
+// 🔑 Configuração do Supabase
 const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
 const SUPABASE_KEY = "SUA_CHAVE_ANON";
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Variáveis globais
+let map = L.map("map").setView([-15.601, -56.097], 14);
+let ruasLayer;
+let ruaSelecionada = null;
+
+// Adiciona mapa base
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+// Exemplo de ruas (substitua pelo GeoJSON real do bairro)
+const ruasGeoJSON = {
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Rua A" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-56.097, -15.601],
+          [-56.095, -15.602]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Rua B" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-56.098, -15.603],
+          [-56.096, -15.604]
+        ]
+      }
+    }
+  ]
+};
+
+// Estilo inicial das ruas
+function estiloRuas(feature) {
+  return { color: "red", weight: 3, status: "fazer" };
+}
+
+// Ao clicar na rua
+function onEachRua(feature, layer) {
+  layer.on("click", function() {
+    if (ruaSelecionada) {
+      ruasLayer.resetStyle(ruaSelecionada);
+    }
+    ruaSelecionada = layer;
+    layer.setStyle({ color: "blue", weight: 5 });
+  });
+}
+
+ruasLayer = L.geoJSON(ruasGeoJSON, {
+  style: estiloRuas,
+  onEachFeature: onEachRua
+}).addTo(map);
+
+// Funções de controle
+function marcarFeita() {
+  if (ruaSelecionada) {
+    ruaSelecionada.setStyle({ color: "green", weight: 4 });
+    ruaSelecionada.options.status = "feita";
+  }
+}
+
+function marcarFazer() {
+  if (ruaSelecionada) {
+    ruaSelecionada.setStyle({ color: "red", weight: 3 });
+    ruaSelecionada.options.status = "fazer";
+  }
+}
+
+function limparSelecao() {
+  if (ruaSelecionada) {
+    ruasLayer.resetStyle(ruaSelecionada);
+    ruaSelecionada = null;
+  }
+}
+
+// 💾 Salvar no Supabase
 async function salvarProgresso() {
   let progresso = [];
 
   ruasLayer.eachLayer(function(layer) {
-    let nome = layer.feature.properties.name || layer.feature.properties.id;
+    let nome = layer.feature.properties.name;
     let status = layer.options.status || "fazer";
-
     progresso.push({ nome, status });
   });
 
-  // Limpa tabela e insere novamente
-  await supabase.from("ruas").delete().neq("id", 0);
-  let { data, error } = await supabase.from("ruas").insert(progresso);
+  // Limpa e reinsere os dados
+  await supabaseClient.from("ruas").delete().neq("id", 0);
+  let { error } = await supabaseClient.from("ruas").insert(progresso);
 
   if (error) {
     console.error("Erro ao salvar:", error);
     alert("Erro ao salvar progresso!");
   } else {
-    alert("Progresso salvo com sucesso!");
+    alert("✅ Progresso salvo com sucesso!");
   }
 }
+
+// 📥 Carregar do Supabase
 async function carregarProgresso() {
-  let { data, error } = await supabase.from("ruas").select("*");
+  let { data, error } = await supabaseClient.from("ruas").select("*");
 
   if (error) {
     console.error("Erro ao carregar:", error);
@@ -36,7 +117,7 @@ async function carregarProgresso() {
   }
 
   ruasLayer.eachLayer(function(layer) {
-    let nome = layer.feature.properties.name || layer.feature.properties.id;
+    let nome = layer.feature.properties.name;
     let rua = data.find(r => r.nome === nome);
 
     if (rua) {
@@ -51,179 +132,6 @@ async function carregarProgresso() {
   });
 }
 
-
-
-// ====== Supabase ======
-const SUPABASE_URL = "https://SEU_PROJETO.supabase.co";     // <- troque
-const SUPABASE_ANON_KEY = "SEU_ANON_PUBLIC_KEY";            // <- troque
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ====== Mapa ======
-const map = L.map("map");
-const tijucalBounds = L.latLngBounds(
-  L.latLng(-15.657, -56.105),
-  L.latLng(-15.645, -56.090)
-);
-map.fitBounds(tijucalBounds);
-
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "&copy; OpenStreetMap contributors"
-}).addTo(map);
-
-let ruasLayer;
-let selecionado = null;
-// Mapa de id->layer para atualizar rápido
-const camadaPorId = new Map();
-
-function estiloRua() {
-  return { color: "red", weight: 3 };
-}
-
-function pintarPorStatus(layer, status) {
-  if (status === "feita") {
-    layer.setStyle({ color: "green", weight: 4 });
-    layer.options.status = "feita";
-  } else {
-    layer.setStyle({ color: "red", weight: 3 });
-    layer.options.status = "fazer";
-  }
-}
-
-function onEachRua(feature, layer) {
-  const ruaId = feature.properties.id;
-  camadaPorId.set(ruaId, layer);
-
-  layer.on("click", () => {
-    if (selecionado) {
-      // restaura cor anterior da seleção
-      pintarPorStatus(selecionado, selecionado.options.status || "fazer");
-    }
-    selecionado = layer;
-    layer.setStyle({ color: "blue", weight: 6 });
-    layer.bindPopup(feature.properties.name || feature.properties.id).openPopup();
-  });
-}
-
-function osmToGeoJSON(osmData) {
-  const features = osmData.elements
-    .map((el) => {
-      if (el.type === "way" && el.geometry) {
-        return {
-          type: "Feature",
-          properties: {
-            name: el.tags && el.tags.name ? el.tags.name : null,
-            id: el.id
-          },
-          geometry: {
-            type: "LineString",
-            coordinates: el.geometry.map((p) => [p.lon, p.lat])
-          }
-        };
-      }
-    })
-    .filter((f) => f !== undefined);
-
-  return { type: "FeatureCollection", features };
-}
-
-// ====== Carrega vias do OSM e depois aplica progresso do Supabase ======
-fetch(`https://overpass-api.de/api/interpreter?data=
-[out:json][timeout:25];
-area["name"="Tijucal"]["boundary"="administrative"]->.a;
-way(area.a)["highway"];
-out geom;`)
-  .then((res) => res.json())
-  .then(async (data) => {
-    ruasLayer = L.geoJSON(osmToGeoJSON(data), {
-      style: estiloRua,
-      onEachFeature: onEachRua
-    }).addTo(map);
-
-    // Depois que as camadas existem, aplica status salvo no banco
-    await carregarProgresso();
-    // Habilita realtime (opcional e lindo)
-    iniciarRealtime();
-  })
-  .catch((err) => console.error("Erro ao carregar ruas:", err));
-
-// ====== Botões ======
-document.getElementById("btnFeita").addEventListener("click", () => {
-  if (!selecionado) return alert("Selecione uma rua primeiro.");
-  pintarPorStatus(selecionado, "feita");
-});
-
-document.getElementById("btnFazer").addEventListener("click", () => {
-  if (!selecionado) return alert("Selecione uma rua primeiro.");
-  pintarPorStatus(selecionado, "fazer");
-});
-
-document.getElementById("btnLimpar").addEventListener("click", () => {
-  if (!selecionado) return;
-  pintarPorStatus(selecionado, selecionado.options.status || "fazer");
-  selecionado = null;
-});
-
-document.getElementById("btnSalvar").addEventListener("click", salvarProgresso);
-
-// ====== Persistência no Supabase ======
-async function salvarProgresso() {
-  if (!ruasLayer) return;
-
-  const rows = [];
-  ruasLayer.eachLayer((layer) => {
-    const id = layer.feature.properties.id;
-    const name = layer.feature.properties.name || String(id);
-    const status = layer.options.status || "fazer";
-    rows.push({ id, name, status });
-  });
-
-  const { error } = await supabase.from("ruas").upsert(rows, { onConflict: "id" });
-  if (error) {
-    console.error(error);
-    alert("❌ Erro ao salvar: " + error.message);
-  } else {
-    alert("✅ Progresso salvo no Supabase!");
-  }
-}
-
-async function carregarProgresso() {
-  const { data, error } = await supabase.from("ruas").select("id, status");
-  if (error) {
-    console.error("Erro ao carregar progresso:", error);
-    return;
-  }
-  const mapa = new Map(data.map((r) => [String(r.id), r.status]));
-  aplicarProgresso(mapa);
-}
-
-function aplicarProgresso(mapaIdStatus) {
-  ruasLayer.eachLayer((layer) => {
-    const id = String(layer.feature.properties.id);
-    const status = mapaIdStatus.get(id) || "fazer";
-    pintarPorStatus(layer, status);
-  });
-}
-
-// ====== Realtime: reflete alterações feitas por outras pessoas ao vivo ======
-function iniciarRealtime() {
-  const channel = supabase
-    .channel("ruas-changes")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "ruas" },
-      (payload) => {
-        const row = payload.new || payload.old;
-        if (!row) return;
-        const layer = camadaPorId.get(row.id);
-        if (!layer) return;
-        // atualiza estilo no mapa
-        pintarPorStatus(layer, row.status || "fazer");
-      }
-    )
-    .subscribe();
-}
-
-// Barra de busca restrita ao bairro Tijucal
-L.Control.geocoder({ defaultMarkGeocode: true, bounds: tijucalBounds }).addTo(map);
-
+// Chama carregar ao abrir
+carregarProgresso();
 
